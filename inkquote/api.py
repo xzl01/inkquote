@@ -11,9 +11,32 @@ from .models import CATEGORIES
 from .store import QuoteStore
 
 
+ALLOWED_FIELDS = {
+    "id", "text", "category", "work", "author", "speaker", "location",
+    "source_url", "license", "language", "tags", "retrieved_at", "verified",
+}
+
+
 def _param(query: dict[str, list[str]], name: str, default=None):
     vals = query.get(name)
     return vals[0] if vals else default
+
+
+def _fields(query: dict[str, list[str]]) -> list[str] | None:
+    raw = _param(query, "fields")
+    if not raw:
+        return None
+    fields = [f.strip() for f in raw.split(",") if f.strip()]
+    bad = [f for f in fields if f not in ALLOWED_FIELDS]
+    if bad:
+        raise ValueError(f"不支持的字段：{bad}；可用字段：{sorted(ALLOWED_FIELDS)}")
+    return fields
+
+
+def _project(quote: dict, fields: list[str] | None) -> dict:
+    if not fields:
+        return quote
+    return {k: quote.get(k) for k in fields}
 
 
 class InkQuoteHandler(BaseHTTPRequestHandler):
@@ -50,7 +73,9 @@ class InkQuoteHandler(BaseHTTPRequestHandler):
                         "description": "可溯源的短语/金句只读 API",
                         "endpoints": [
                             "GET /api/health",
-                            "GET /api/random?category=book|internet|anime|movie&tag=&language=&verified=1",
+                            "GET /api/random?category=book|internet|anime|movie&tag=&language=&verified=1&fields=text,work,author,location",
+                            "GET /api/daily?date=YYYY-MM-DD&category=&verified=1",
+                            "GET /api/export.json?category=&verified=1&minified=1&fields=text,work",
                             "GET /api/quotes?q=&category=&tag=&language=&limit=20&offset=0&verified=1",
                             "GET /api/quotes/{id}",
                             "GET /api/stats",
@@ -74,6 +99,11 @@ class InkQuoteHandler(BaseHTTPRequestHandler):
                 if category and category not in CATEGORIES:
                     self._error(400, f"category 必须是 {CATEGORIES} 之一")
                     return
+                try:
+                    fields = _fields(query)
+                except ValueError as exc:
+                    self._error(400, str(exc))
+                    return
                 quote = self.store.random(
                     category=category,
                     tag=_param(query, "tag"),
@@ -83,7 +113,28 @@ class InkQuoteHandler(BaseHTTPRequestHandler):
                 if not quote:
                     self._error(404, "没有符合条件的金句")
                     return
-                self._json({"quote": quote})
+                self._json({"quote": _project(quote, fields)})
+                return
+            if path == "/api/daily":
+                date_str = _param(query, "date") or __import__("datetime").date.today().isoformat()
+                category = _param(query, "category")
+                if category and category not in CATEGORIES:
+                    self._error(400, f"category 必须是 {CATEGORIES} 之一")
+                    return
+                try:
+                    fields = _fields(query)
+                    quote = self.store.daily(
+                        date_str,
+                        category=category,
+                        verified_only=_param(query, "verified") in ("1", "true", "yes"),
+                    )
+                except ValueError as exc:
+                    self._error(400, str(exc))
+                    return
+                if not quote:
+                    self._error(404, "没有符合条件的金句")
+                    return
+                self._json({"date": date_str, "quote": _project(quote, fields)})
                 return
             if path == "/api/quotes":
                 category = _param(query, "category")
@@ -93,8 +144,9 @@ class InkQuoteHandler(BaseHTTPRequestHandler):
                 try:
                     limit = int(_param(query, "limit", 20))
                     offset = int(_param(query, "offset", 0))
-                except ValueError:
-                    self._error(400, "limit/offset 必须是整数")
+                    fields = _fields(query)
+                except ValueError as exc:
+                    self._error(400, f"limit/offset 必须是整数；{exc}")
                     return
                 items, total = self.store.search(
                     q=_param(query, "q"),
@@ -105,7 +157,10 @@ class InkQuoteHandler(BaseHTTPRequestHandler):
                     limit=limit,
                     offset=offset,
                 )
-                self._json({"total": total, "limit": limit, "offset": offset, "items": items})
+                self._json(
+                    {"total": total, "limit": limit, "offset": offset,
+                     "items": [_project(q, fields) for q in items]}
+                )
                 return
             if path.startswith("/api/quotes/"):
                 quote_id = path.rsplit("/", 1)[-1]
@@ -114,6 +169,39 @@ class InkQuoteHandler(BaseHTTPRequestHandler):
                     self._error(404, "找不到该 id")
                     return
                 self._json({"quote": quote})
+                return
+            if path == "/api/export.json":
+                category = _param(query, "category")
+                if category and category not in CATEGORIES:
+                    self._error(400, f"category 必须是 {CATEGORIES} 之一")
+                    return
+                try:
+                    fields = _fields(query)
+                except ValueError as exc:
+                    self._error(400, str(exc))
+                    return
+                items = list(
+                    self.store.iter_filtered(
+                        category=category,
+                        verified_only=_param(query, "verified") in ("1", "true", "yes"),
+                        language=_param(query, "language"),
+                    )
+                )
+                items = [_project(q, fields) for q in items]
+                minified = _param(query, "minified", "1") not in ("0", "false", "no")
+                body = json.dumps(
+                    items,
+                    ensure_ascii=False,
+                    separators=(",", ":") if minified else None,
+                    indent=None if minified else 2,
+                ).encode("utf-8")
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json; charset=utf-8")
+                self.send_header("Content-Length", str(len(body)))
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.send_header("Cache-Control", "public, max-age=60")
+                self.end_headers()
+                self.wfile.write(body)
                 return
             if path == "/api/export.jsonl":
                 self.send_response(200)

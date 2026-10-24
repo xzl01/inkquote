@@ -79,8 +79,14 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("import", help="导入 JSONL")
     p.add_argument("file")
 
-    p = sub.add_parser("export", help="导出 JSONL")
+    p = sub.add_parser("export", help="导出 JSONL 或 JSON 数组")
     p.add_argument("file")
+    p.add_argument("--format", choices=("jsonl", "json"), default=None,
+                   help="默认按扩展名推断：.json 为 JSON 数组，其余为 JSONL")
+    p.add_argument("--category", choices=CATEGORIES)
+    p.add_argument("--language")
+    p.add_argument("--verified-only", action="store_true")
+    p.add_argument("--pretty", action="store_true", help="JSON 缩进输出（默认 minified，ESP 更省流量）")
 
     p = sub.add_parser("validate", help="校验 JSONL 文件")
     p.add_argument("file")
@@ -126,6 +132,10 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--max-chars", type=int, default=40)
     p.add_argument("--limit", type=int, default=50)
     p.add_argument("--dry-run", action="store_true")
+
+    p = sub.add_parser("pack", help="生成 ESP/静态托管用的 JSON 数据集目录")
+    p.add_argument("outdir", nargs="?", default="static")
+    p.add_argument("--verified-only", action="store_true")
 
     p = sub.add_parser("books", help="从 TXT / EPUB 提取候选句子")
     p.add_argument("file")
@@ -187,8 +197,74 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.cmd == "export":
-        n = store.export_jsonl(args.file)
-        print(f"已导出 {n} 条到 {args.file}")
+        fmt = args.format
+        if fmt is None:
+            fmt = "json" if Path(args.file).suffix.lower() == ".json" else "jsonl"
+        if fmt == "json":
+            n = store.export_json(
+                args.file,
+                category=args.category,
+                verified_only=args.verified_only,
+                language=args.language,
+                minified=not args.pretty,
+            )
+        else:
+            n = store.export_jsonl(args.file)
+        print(f"已导出 {n} 条到 {args.file}（{fmt}）")
+        return 0
+
+    if args.cmd == "pack":
+        out = Path(args.outdir)
+        out.mkdir(parents=True, exist_ok=True)
+        items = list(store.iter_filtered(verified_only=args.verified_only))
+        quotes_path = out / "quotes.json"
+        quotes_path.write_text(
+            json.dumps(items, ensure_ascii=False, separators=(",", ":")),
+            encoding="utf-8",
+        )
+        (out / "quotes.jsonl").write_text(
+            "\n".join(json.dumps(q, ensure_ascii=False, sort_keys=True) for q in items) + "\n",
+            encoding="utf-8",
+        )
+        by_cat = {}
+        for cat in CATEGORIES:
+            cat_items = [q for q in items if q["category"] == cat]
+            by_cat[cat] = len(cat_items)
+            if cat_items:
+                (out / f"{cat}.json").write_text(
+                    json.dumps(cat_items, ensure_ascii=False, separators=(",", ":")),
+                    encoding="utf-8",
+                )
+        manifest = {
+            "schema_version": 1,
+            "name": "InkQuote",
+            "version": __version__,
+            "generated_at": __import__("datetime").datetime.now().astimezone().isoformat(timespec="seconds"),
+            "total": len(items),
+            "verified_only": args.verified_only,
+            "by_category": by_cat,
+            "files": {
+                "quotes": "quotes.json",
+                "quotes_jsonl": "quotes.jsonl",
+                **{c: f"{c}.json" for c in CATEGORIES if by_cat[c]},
+                "manifest": "manifest.json",
+            },
+            "fields": [
+                "id", "text", "category", "work", "author", "speaker",
+                "location", "source_url", "license", "language", "tags",
+                "retrieved_at", "verified",
+            ],
+            "notes": "每条必须带 work+location；internet 类带 source_url；license 逐条标注。",
+        }
+        (out / "manifest.json").write_text(
+            json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+        total_bytes = sum(f.stat().st_size for f in out.iterdir() if f.is_file())
+        print(f"已生成 {out}/：")
+        for f in sorted(out.iterdir()):
+            if f.is_file():
+                print(f"  {f.name:<16} {f.stat().st_size:>8} B")
+        print(f"合计 {total_bytes} B / {len(items)} 条（minified JSON，适合 ESP 拉取）")
         return 0
 
     if args.cmd == "validate":

@@ -58,6 +58,24 @@ class QuoteStoreTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.store.upsert(Quote(text="x", category="book", work="", location=""))
 
+    def test_export_json_and_daily(self):
+        out = Path(self.tmp.name) / "quotes.json"
+        n = self.store.export_json(out, category="book")
+        self.assertEqual(n, 1)
+        text = out.read_text(encoding="utf-8")
+        self.assertNotIn("\n  ", text)  # 默认 minified
+        data = json.loads(text)
+        self.assertEqual(data[0]["work"], "道德经")
+        pretty = Path(self.tmp.name) / "quotes-pretty.json"
+        self.store.export_json(pretty, minified=False)
+        self.assertIn("\n  ", pretty.read_text(encoding="utf-8"))
+
+        q1 = self.store.daily("2026-10-24")
+        q2 = self.store.daily("2026-10-24")
+        self.assertEqual(q1["id"], q2["id"])
+        with self.assertRaises(ValueError):
+            self.store.daily("2026/10/24")
+
     def test_export_import_roundtrip(self):
         out = Path(self.tmp.name) / "out.jsonl"
         self.assertEqual(self.store.export_jsonl(out), 3)

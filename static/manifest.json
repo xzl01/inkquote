@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "name": "InkQuote",
+  "version": "0.2.0",
+  "generated_at": "2026-10-24T22:03:28+08:00",
+  "total": 21,
+  "verified_only": false,
+  "by_category": {
+    "book": 9,
+    "internet": 6,
+    "anime": 3,
+    "movie": 3
+  },
+  "files": {
+    "quotes": "quotes.json",
+    "quotes_jsonl": "quotes.jsonl",
+    "book": "book.json",
+    "internet": "internet.json",
+    "anime": "anime.json",
+    "movie": "movie.json",
+    "manifest": "manifest.json"
+  },
+  "fields": [
+    "id",
+    "text",
+    "category",
+    "work",
+    "author",
+    "speaker",
+    "location",
+    "source_url",
+    "license",
+    "language",
+    "tags",
+    "retrieved_at",
+    "verified"
+  ],
+  "notes": "每条必须带 work+location；internet 类带 source_url；license 逐条标注。"
+}

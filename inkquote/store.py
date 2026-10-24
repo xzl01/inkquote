@@ -1,6 +1,7 @@
 """SQLite 存储 + JSONL 导入导出。"""
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import random
@@ -189,8 +190,27 @@ class QuoteStore:
         }
 
     def iter_all(self) -> Iterator[dict]:
+        yield from self.iter_filtered()
+
+    def iter_filtered(
+        self,
+        category: str | None = None,
+        verified_only: bool = False,
+        language: str | None = None,
+    ) -> Iterator[dict]:
+        sql = "SELECT * FROM quotes WHERE 1=1"
+        args: list = []
+        if category:
+            sql += " AND category=?"
+            args.append(category)
+        if language:
+            sql += " AND language=?"
+            args.append(language)
+        if verified_only:
+            sql += " AND verified=1"
+        sql += " ORDER BY category, work, id"
         with self._connect() as conn:
-            for row in conn.execute("SELECT * FROM quotes ORDER BY category, work, id"):
+            for row in conn.execute(sql, args):
                 yield _row_to_dict(row)
 
     def export_jsonl(self, path: str | os.PathLike) -> int:
@@ -202,6 +222,44 @@ class QuoteStore:
                 fh.write(json.dumps(d, ensure_ascii=False, sort_keys=True) + "\n")
                 n += 1
         return n
+
+    def export_json(
+        self,
+        path: str | os.PathLike,
+        category: str | None = None,
+        verified_only: bool = False,
+        language: str | None = None,
+        minified: bool = True,
+    ) -> int:
+        """导出为单个 JSON 数组（ESP/嵌入式友好）。"""
+        items = list(self.iter_filtered(category, verified_only, language))
+        p = Path(path)
+        p.parent.mkdir(parents=True, exist_ok=True)
+        with p.open("w", encoding="utf-8") as fh:
+            if minified:
+                json.dump(items, fh, ensure_ascii=False, separators=(",", ":"))
+            else:
+                json.dump(items, fh, ensure_ascii=False, indent=2)
+        return len(items)
+
+    def daily(
+        self,
+        date_str: str,
+        category: str | None = None,
+        verified_only: bool = False,
+    ) -> dict | None:
+        """按日期稳定选一条：day_number % n，ESP 离线也能复现同一结果。"""
+        from datetime import date as _date
+
+        try:
+            day = _date.fromisoformat(date_str)
+        except ValueError as exc:
+            raise ValueError("date 必须是 YYYY-MM-DD") from exc
+        items = list(self.iter_filtered(category, verified_only))
+        if not items:
+            return None
+        day_number = (day - _date(1970, 1, 1)).days
+        return items[day_number % len(items)]
 
     def import_jsonl(self, path: str | os.PathLike) -> dict[str, int]:
         quotes: list[Quote] = []

@@ -29,6 +29,9 @@ python3 -m inkquote search --q 道德 --json
 
 # 启动 HTTP API
 python3 -m inkquote serve --host 127.0.0.1 --port 8765
+
+# 生成给 ESP / 静态托管用的 JSON 数据集
+python3 -m inkquote pack static
 ```
 
 ```bash
@@ -76,11 +79,13 @@ curl 'http://127.0.0.1:8765/api/export.jsonl' > quotes.jsonl
 | 方法 | 路径 | 说明 |
 |---|---|---|
 | GET | `/api/health` | 健康检查 + 统计 |
-| GET | `/api/random` | 随机一条，支持 `category` `tag` `language` `verified=1` |
-| GET | `/api/quotes` | 搜索，支持 `q` `category` `tag` `language` `verified=1` `limit` `offset` |
+| GET | `/api/random` | 随机一条，支持 `category` `tag` `language` `verified=1` `fields=text,work,...` |
+| GET | `/api/daily` | 按日期稳定选一条（`date=YYYY-MM-DD`），ESP 离线可复现 |
+| GET | `/api/quotes` | 搜索，支持 `q` `category` `tag` `language` `verified=1` `limit` `offset` `fields` |
 | GET | `/api/quotes/{id}` | 按 id 取 |
 | GET | `/api/stats` | 总量/分类/已核对数 |
 | GET | `/api/categories` | 分类列表 |
+| GET | `/api/export.json` | 导出 JSON 数组（默认 minified，ESP 友好） |
 | GET | `/api/export.jsonl` | 导出全部 JSONL |
 
 响应统一 UTF-8 JSON，带 `Access-Control-Allow-Origin: *`，可直接给浏览器/其他服务调用。
@@ -95,6 +100,27 @@ print(f"「{quote['text']}」")
 print(f"— {quote['author']}《{quote['work']}》· {quote['location']}")
 print(quote["source_url"])
 ```
+
+## ESP32 / ESP8266 使用
+
+ESP 上推荐两种取法：
+
+1. **联网随机**：`GET /api/random?verified=1&fields=text,work,author,location`，单条约 250–350 B；
+2. **离线/每日一句**：把 `static/quotes.json`（当前 8.5 KB）放进 LittleFS，按 `day_number % 条数` 取，和 `/api/daily` 算法一致。
+
+`static/` 里已经生成好全量 + 四个分类的 minified JSON，可直接从 GitHub raw 拉取：
+
+```
+https://raw.githubusercontent.com/xzl01/inkquote/main/static/quotes.json
+https://raw.githubusercontent.com/xzl01/inkquote/main/static/anime.json
+```
+
+完整说明见 [`docs/JSON_FORMAT.md`](docs/JSON_FORMAT.md)，可编译示例见 [`examples/`](examples/)：
+
+- `examples/esp32_random_quote/`：Wi-Fi + HTTP + ArduinoJson 7 取随机金句
+- `examples/esp32_offline_daily/`：LittleFS + 每日一句（NTP 校时）
+
+> 小内存设备（ESP8266）不要一次解析整个数组；用分类文件或 `/api/quotes?limit=20&offset=...` 分页。
 
 ## 采集内容
 
@@ -174,7 +200,10 @@ inkquote/
 │       ├── srt.py         # 字幕适配器
 │       └── books.py       # TXT / EPUB 适配器
 ├── data/quotes.jsonl      # 内置种子数据
-└── tests/                 # 标准库 unittest，27 个用例
+├── static/                # 已生成的 JSON/JSONL 数据集（ESP 可直接用）
+├── examples/              # ESP32 在线/离线示例
+├── docs/JSON_FORMAT.md    # JSON 格式与 ESP 内存注意事项
+└── tests/                 # 标准库 unittest，33 个用例
 ```
 
 ## 开发
@@ -188,7 +217,7 @@ python3 -m unittest discover -s tests -v
 - [ ] 写入型 API（带 token）与 Web 管理界面
 - [ ] 自动/半自动质量打分（长度、去重、出处完整度）
 - [ ] 标签体系与主题合集（「离别」「希望」「代码」…）
-- [ ] 静态 JSON 数据集定期发布（GitHub Releases）
+- [x] 静态 JSON 数据集（`static/` + Release 附件）
 - [ ] 与「墨读」「墨屏待机」联动：待机图直接拉取当天金句
 - [ ] Dockerfile / 一键部署
 

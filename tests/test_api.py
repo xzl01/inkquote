@@ -64,6 +64,26 @@ class ApiTest(unittest.TestCase):
         _, data = self.get(f"/api/quotes/{quote['id']}")
         self.assertEqual(data["quote"]["id"], quote["id"])
 
+    def test_export_json(self):
+        _, data = self.get("/api/export.json")
+        self.assertIsInstance(data, list)
+        self.assertEqual(len(data), 1)
+        self.assertEqual(data[0]["work"], "道德经")
+
+    def test_daily(self):
+        _, data = self.get("/api/daily?date=2026-10-24")
+        self.assertEqual(data["date"], "2026-10-24")
+        self.assertTrue(data["quote"]["id"])
+        _, again = self.get("/api/daily?date=2026-10-24")
+        self.assertEqual(data["quote"]["id"], again["quote"]["id"])
+
+    def test_fields_projection(self):
+        _, data = self.get("/api/random?fields=text,work")
+        self.assertEqual(set(data["quote"].keys()), {"text", "work"})
+        with self.assertRaises(urllib.error.HTTPError) as ctx:
+            self.get("/api/random?fields=text,bogus")
+        self.assertEqual(ctx.exception.code, 400)
+
     def test_404(self):
         with self.assertRaises(urllib.error.HTTPError) as ctx:
             self.get("/api/quotes/not-exist")
