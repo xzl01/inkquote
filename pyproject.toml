@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "inkquote"
+version = "0.1.0"
+description = "可溯源的短语/金句库 + 只读 HTTP API + CLI"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [{name = "xzl01"}]
+keywords = ["quotes", "provenance", "sqlite", "eink", "rss"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+
+[project.urls]
+Homepage = "https://github.com/xzl01/inkquote"
+Source = "https://github.com/xzl01/inkquote"
+
+[project.scripts]
+inkquote = "inkquote.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["inkquote*"]
