@@ -106,7 +106,7 @@ print(quote["source_url"])
 ESP 上推荐两种取法：
 
 1. **联网随机**：`GET /api/random?verified=1&fields=text,work,author,location`，单条约 250–350 B；
-2. **离线/每日一句**：把 `static/quotes.json`（当前 8.5 KB）放进 LittleFS，按 `day_number % 条数` 取，和 `/api/daily` 算法一致。
+2. **离线/每日一句**：把 `static/quotes.json`（当前约 18.9 KB，50 条）放进 LittleFS，按 `day_number % 条数` 取，和 `/api/daily` 算法一致。
 
 `static/` 里已经生成好全量 + 四个分类的 minified JSON，可直接从 GitHub raw 拉取：
 

@@ -32,7 +32,7 @@ ESP 上建议只取 `text,work,author,location`，单条约 250–350 B。
 
 仓库内已生成，可直接给 ESP 拉取或放进 LittleFS：
 
-| 文件 | 内容 | 体积（当前 21 条） |
+| 文件 | 内容 | 体积（当前 50 条） |
 |---|---|---|
 | `static/quotes.json` | 全部，minified JSON 数组 | 18.9 KB |
 | `static/book.json` | 书本分类 | 12.1 KB |
