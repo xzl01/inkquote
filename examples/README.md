@@ -9,7 +9,7 @@
 
 ## 数据准备
 
-仓库里的 `static/` 已生成好（21 条、minified，全量 8.5 KB）：
+仓库里的 `static/` 已生成好（50 条、minified，全量约 18.9 KB）：
 
 ```bash
 python3 -m inkquote pack static       # 重新生成
@@ -32,6 +32,6 @@ https://raw.githubusercontent.com/xzl01/inkquote/main/static/book.json
 ## 内存建议
 
 - 单条 `/api/random` 约 400–600 B；用 `fields=text,work,author,location` 可再省一半。
-- 全量 `quotes.json` 目前 8.5 KB，ESP32 无压力；ESP8266 建议按分类拉取或分页。
+- 全量 `quotes.json` 目前约 18.9 KB，ESP32 无压力；ESP8266 建议按分类拉取或分页。
 - 数据变大后不要一次把整个数组放进 JSON 文档：用 `/api/quotes?limit=20&offset=...` 分页，或把数据按分类拆文件。
 - 内网用 HTTP 即可；HTTPS 会多占十几 KB RAM，需要在 `WiFiClientSecure` 里设置证书/指纹。

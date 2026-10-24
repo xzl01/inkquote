@@ -17,7 +17,7 @@
 git clone https://github.com/xzl01/inkquote.git
 cd inkquote
 
-# 初始化 + 导入内置种子数据（21 条，四个分类都有）
+# 初始化 + 导入内置种子数据（50 条，四个分类都有）
 python3 -m inkquote init
 python3 -m inkquote import data/quotes.jsonl
 

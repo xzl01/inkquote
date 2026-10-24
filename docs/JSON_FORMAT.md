@@ -34,13 +34,13 @@ ESP 上建议只取 `text,work,author,location`，单条约 250–350 B。
 
 | 文件 | 内容 | 体积（当前 21 条） |
 |---|---|---|
-| `static/quotes.json` | 全部，minified JSON 数组 | 8.5 KB |
-| `static/book.json` | 书本分类 | 3.4 KB |
-| `static/internet.json` | 互联网分类 | 2.4 KB |
+| `static/quotes.json` | 全部，minified JSON 数组 | 18.9 KB |
+| `static/book.json` | 书本分类 | 12.1 KB |
+| `static/internet.json` | 互联网分类 | 3.3 KB |
 | `static/anime.json` | 动漫分类 | 1.2 KB |
-| `static/movie.json` | 电影分类 | 1.4 KB |
+| `static/movie.json` | 电影分类 | 2.2 KB |
 | `static/manifest.json` | 版本、条数、字段、文件清单 | 0.8 KB |
-| `static/quotes.jsonl` | JSONL 备份 | 9.1 KB |
+| `static/quotes.jsonl` | JSONL 备份 | 20.2 KB |
 
 Raw URL：
 
@@ -81,7 +81,7 @@ index      = day_number % 条目数
 ## 7. ESP 内存注意
 
 - 单条随机响应（默认全字段）约 400–600 B；`fields` 投影后更小。
-- 全量数组当前 8.5 KB；数据增长后建议：
+- 全量数组当前约 18.9 KB；数据增长后建议：
   - 按分类拆文件；
   - 用 `/api/quotes?limit=20&offset=...` 分页；
   - 或只在设备上存 `static/anime.json` 这种子集。
